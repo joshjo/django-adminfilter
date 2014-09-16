@@ -21,22 +21,25 @@ class FilterChangeList(ChangeList):
     """ Extended Django admin changelist for advanced custom filters
 
     """
-    def __init__(self, request, model, list_display, list_display_links, list_filter, date_hierarchy, search_fields, list_select_related, list_per_page, list_editable, model_admin):
+    order_field = None
+    def __init__(self, request, model, list_display, list_display_links, list_filter, date_hierarchy, search_fields, list_select_related, list_per_page, list_max_show_all, list_editable, model_admin):
         self.request = request
         self._filter_form = None
 
-        super(FilterChangeList, self).__init__(request, model, list_display, list_display_links, list_filter, date_hierarchy, search_fields, list_select_related, list_per_page, list_editable, model_admin)
+        super(FilterChangeList, self).__init__(request, model, list_display, list_display_links, list_filter, date_hierarchy, search_fields, list_select_related, list_per_page, list_max_show_all, list_editable, model_admin)
 
         # Ordering parameter override to 'cl'
+        ORDER_TYPE_VAR = 'o'
         if prefix_cl_param(ORDER_VAR) in self.params:
             self.params[ORDER_VAR] = self.params[prefix_cl_param(ORDER_VAR)]
         if prefix_cl_param(ORDER_VAR) in self.params:
             self.params[ORDER_TYPE_VAR] = self.params[prefix_cl_param(ORDER_TYPE_VAR)]
-        self.order_field, self.order_type = self.get_ordering()
+        
+        #self.order_field = self.get_ordering(request, self.get_query_set(request))
 
         # Paginator
         try:
-            self.list_per_page = int(self.filter_form.cleaned_data.get(LIST_PER_PAGE_VAR, ITEMS_PER_PAGE_CONST))
+            self.list_per_page = int(self.filter_form.cleaned_data.get(LIST_PER_PAGE_VAR, 20))
         except ValueError:
             self.list_per_page = ITEMS_PER_PAGE_CONST
 
@@ -45,7 +48,8 @@ class FilterChangeList(ChangeList):
         except ValueError:
             self.page_num = 0
 
-        self.paginator = Paginator(self.get_query_set(), self.list_per_page)
+        self.paginator = Paginator(self.get_query_set(request), self.list_per_page)
+        self.multi_page = not self.request.GET.has_key('cl-all')
         self.result_count = self.paginator.count
 
         if self.filter_form.cleaned_data.get(LIST_PER_PAGE_VAR) == -1:
@@ -65,10 +69,9 @@ class FilterChangeList(ChangeList):
         if self._filter_form is None:
             self._filter_form = self.model_admin.filter_form(self.request.REQUEST)
             self._filter_form.is_valid()
-
         return self._filter_form
 
-    def get_query_set(self):
+    def get_query_set(self, request):
         """ Returns queryset objects for change list
 
             Additional class info:
@@ -77,7 +80,6 @@ class FilterChangeList(ChangeList):
         """
         # self.filter_form.queryset calls S's instance __get__ method with paramater self.root_query_set
         qs = self.filter_form.queryset(self.root_query_set) if hasattr(self.filter_form, 'queryset') else self.root_query_set
-
         # Set ordering - hack for compatibility with MPTTChangeList
         if getattr(self.model_admin, 'use_mptt', False):
             # always order by (tree_id, left)
@@ -88,7 +90,9 @@ class FilterChangeList(ChangeList):
         else:
             if self.order_field:
                 qs = qs.order_by('%s%s' % ((self.order_type == 'desc' and '-' or ''), self.order_field))
-
+        # Set ordering.
+        ordering = self.get_ordering(request, qs)
+        qs = qs.order_by(*ordering)
         return qs.distinct()
 
     def get_query_string(self, new_params=None, remove=None):
