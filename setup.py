@@ -7,6 +7,7 @@ setup(
     author_email='josue.ttito@ucsp.edu.pe',
     url='https://github.com/joshjo/django-adminfilter',
     install_requires=[
+        'django>=1.3',
         'django-mptt>=0.4',
     ],
     description='Django admin filters.',

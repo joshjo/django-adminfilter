@@ -1,0 +1,3 @@
+include setup.py MANIFEST.in
+recursive-include adminfilter/templates *.html
+recursive-exclude adminfilter *.pyc
