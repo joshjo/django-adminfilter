@@ -218,7 +218,7 @@ class FilterForm(forms.Form):
         """ ignores form errors
 
         """
-        self._get_errors()
+        self.errors
         return self.is_bound
 
     def clean(self):
